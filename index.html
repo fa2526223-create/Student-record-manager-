@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Record Manager</title>
+<style>
+  :root{--bg:#eef3f7;--card:#fff;--ink:#1d2b36;--muted:#5d6e7b;--line:#d3dde5;--accent:#1f6f8b;--danger:#b3372f}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Georgia,"Times New Roman",serif;background:var(--bg);color:var(--ink);line-height:1.5}
+  main{max-width:860px;margin:0 auto;padding:20px 14px 40px}
+  h1{font-size:1.7rem;margin:.2em 0}
+  p.sub{color:var(--muted);margin:0 0 18px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+  h2{font-size:1.1rem;margin:0 0 12px}
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  label{display:block;font-size:.9rem;color:var(--muted);margin-bottom:4px}
+  input,select{width:100%;padding:9px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff}
+  input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .err{color:var(--danger);font-size:.85rem;min-height:1.2em;margin-top:3px}
+  button{font:inherit;padding:9px 16px;border:0;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;margin-top:12px}
+  button.del{background:var(--danger);margin:0;padding:5px 10px}
+  .msg{margin-top:10px;font-size:.9rem}
+  .ok{color:#1f7a45}
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:#e3edf3}
+  .empty{color:var(--muted);padding:12px 0}
+  .note{font-size:.85rem;color:var(--muted);margin-top:10px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Student Record Manager</h1>
+  <p class="sub">Add, search and delete student records in your browser.</p>
+
+  <section>
+    <h2>Add student</h2>
+    <div class="row">
+      <div><label for="name">Student name</label><input id="name" type="text" placeholder="e.g. Ayesha Khan"><div class="err" id="e-name"></div></div>
+      <div><label for="roll">Roll number</label><input id="roll" type="text" placeholder="e.g. 21-CS-045"><div class="err" id="e-roll"></div></div>
+      <div><label for="program">Program</label>
+        <select id="program">
+          <option value="">Select program</option>
+          <option>BSCS</option><option>BSIT</option><option>BBA</option><option>BSSE</option><option>MBA</option>
+        </select><div class="err" id="e-program"></div></div>
+      <div><label for="semester">Semester</label>
+        <select id="semester"><option value="">Select semester</option></select>
+        <div class="err" id="e-semester"></div></div>
+    </div>
+    <button id="add">Add student</button>
+    <div class="msg" id="msg" role="status"></div>
+  </section>
+
+  <section>
+    <h2>Records</h2>
+    <label for="search">Search by name or roll number</label>
+    <input id="search" type="search" placeholder="Type to search">
+    <div class="scroll" style="margin-top:12px">
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Roll no.</th><th>Program</th><th>Semester</th><th>Action</th></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty"></div>
+    <p class="note">Records are saved with localStorage. Limitations: data stays only in this browser on this device, is not shared with other users or devices, is lost if site data is cleared (or in private mode), is not encrypted, and holds about 5 MB. A real system needs a server and database.</p>
+  </section>
+</main>
+
+<script>
+  const KEY = "studentRecords";
+  let students = [];
+
+  try { students = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { students = []; }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(students)); } catch (e) {} }
+
+  const $ = id => document.getElementById(id);
+  for (let i = 1; i <= 8; i++) { const o = document.createElement("option"); o.textContent = "Semester " + i; o.value = i; $("semester").appendChild(o); }
+
+  function setErr(field, text) { $("e-" + field).textContent = text; }
+
+  function validate() {
+    ["name","roll","program","semester"].forEach(f => setErr(f, ""));
+    let ok = true;
+    const name = $("name").value.trim(), roll = $("roll").value.trim();
+    if (!name) { setErr("name", "Name is required."); ok = false; }
+    else if (!/^[A-Za-z][A-Za-z .'-]{1,}$/.test(name)) { setErr("name", "Use letters only (min 2 characters)."); ok = false; }
+    if (!roll) { setErr("roll", "Roll number is required."); ok = false; }
+    else if (students.some(s => s.roll.toLowerCase() === roll.toLowerCase())) { setErr("roll", "This roll number already exists."); ok = false; }
+    if (!$("program").value) { setErr("program", "Select a program."); ok = false; }
+    if (!$("semester").value) { setErr("semester", "Select a semester."); ok = false; }
+    return ok;
+  }
+
+  function render() {
+    const q = $("search").value.trim().toLowerCase();
+    const list = students.filter(s => s.name.toLowerCase().includes(q) || s.roll.toLowerCase().includes(q));
+    const body = $("body");
+    body.innerHTML = "";
+    list.forEach((s, i) => {
+      const tr = document.createElement("tr");
+      [i + 1, s.name, s.roll, s.program, "Semester " + s.semester].forEach(v => {
+        const td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
+      });
+      const td = document.createElement("td");
+      const b = document.createElement("button"); b.className = "del"; b.textContent = "Delete";
+      b.onclick = () => remove(s.roll);
+      td.appendChild(b); tr.appendChild(td); body.appendChild(tr);
+    });
+    $("empty").textContent = students.length === 0 ? "No records yet. Add a student above."
+      : list.length === 0 ? "No records match your search." : "";
+  }
+
+  function remove(roll) {
+    if (!confirm("Delete this student record?")) return;
+    students = students.filter(s => s.roll !== roll);
+    save(); render();
+    showMsg("Record deleted.");
+  }
+
+  function showMsg(t) { $("msg").innerHTML = ""; const s = document.createElement("span"); s.className = "ok"; s.textContent = t; $("msg").appendChild(s); }
+
+  $("add").onclick = () => {
+    if (!validate()) { $("msg").textContent = ""; return; }
+    students.push({ name: $("name").value.trim(), roll: $("roll").value.trim(), program: $("program").value, semester: $("semester").value });
+    save(); render();
+    ["name","roll","program","semester"].forEach(f => $(f).value = "");
+    showMsg("Student added.");
+  };
+  $("search").oninput = render;
+  render();
+</script>
+</body>
+</html>
